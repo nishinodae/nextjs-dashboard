@@ -5,6 +5,7 @@ export const authConfig = {
   pages: {
     signIn: '/login',
   },
+  //logic to protect routes
   callbacks: {
     //auth contains the user's session
     //request contains incoming request
