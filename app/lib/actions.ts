@@ -5,17 +5,17 @@ import postgres from 'postgres';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
-const sql = postgres(process.env.POSTGRES_URL!, {ssl:'require'});
+const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 
 const FormSchema = z.object({
-    id:z.string(),
+    id: z.string(),
     customerId: z.string(),
     amount: z.coerce.number(),
     status: z.enum(['pending', 'paid']),
     date: z.string(),
 })
 
-const CreateInvoice = FormSchema.omit({id:true, date:true});
+const CreateInvoice = FormSchema.omit({ id: true, date: true });
 
 export async function createInvoice(formData: FormData) {
     const rawFormData = {
@@ -23,19 +23,66 @@ export async function createInvoice(formData: FormData) {
         amount: formData.get('amount'),
         status: formData.get('status')
     }
-    const {customerId, amount, status} = CreateInvoice.parse(rawFormData);
+    const { customerId, amount, status } = CreateInvoice.parse(rawFormData);
     const amountInCents = amount * 100;
     const date = new Date().toISOString().split('T')[0];
-    
-    //insert validated data into database
-    await sql`
+
+    // try {
+        //insert validated data into database
+        await sql`
         INSERT INTO invoices (customer_id, amount, status, date)
-        VALUES (${customerId}, ${amountInCents}, ${status}, ${date})
-    `;
+        VALUES (${customerId}, ${amountInCents}, ${status}, ${date})`;
+    // } catch (e) {
+    //     console.error(e);
+    //     return { message: 'Database Error: Failed to Create Invoice' }
+    // }
+
+
+    //revalidate the path, so cache is cleared and fresh data is fetched
+    revalidatePath('/dashboard/invoices');
+
+    //redirect to dashboard/invoices.
+    //redirect would only be reachable if try is successful
+    redirect('/dashboard/invoices');
+}
+
+const UpdateInvoice = FormSchema.omit({ id: true, date: true });
+
+export async function updateInvoice(id: string, formData: FormData) {
+    const rawFormData = {
+        customerId: formData.get('customerId'),
+        amount: formData.get('amount'),
+        status: formData.get('status')
+    }
+    const { customerId, amount, status } = UpdateInvoice.parse(rawFormData);
+    const amountInCents = amount * 100;
+    const date = new Date().toISOString().split('T')[0];
+    // try {
+        //update invoices table with the validated data
+        await sql`
+        UPDATE invoices 
+        SET customer_id = ${customerId}, amount = ${amountInCents}, status =  ${status}, date = ${date}
+        WHERE id = ${id}`;
+    // } catch (e) {
+    //     console.error(e);
+    //     return { message: 'Database Error: Failed to Update Invoice' }
+    // }
 
     //revalidate the path, so cache is cleared and fresh data is fetched
     revalidatePath('/dashboard/invoices');
 
     //redirect to dashboard/invoices
     redirect('/dashboard/invoices');
+}
+
+export async function deleteInvoice(id: string) {
+    // try {
+        //delete invoice from the invoices table
+        await sql`DELETE FROM invoices WHERE id = ${id}`;
+    // } catch (e) {
+    //     console.error(e);
+    //     return { message: 'Database Error: Failed to Delete Invoice' }
+    // }
+    //revalidate the path, so cache is cleared and fresh data is fetched
+    revalidatePath('/dashboard/invoices');
 }
